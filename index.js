@@ -27,13 +27,34 @@ async function run() {
         const bookingsCollections = client.db("doctorsPortal").collection("bookings");
 
         app.get("/appointmentOptions", async (req, res) => {
+            const date = req.query.date;
             const query = {};
             const options = await appointmentOptionCollection.find(query).toArray();
+            const bookingQuery = { appointmentDate: date };
+            const alreadyBook = await bookingsCollections.find(bookingQuery).toArray();
+
+            options.forEach(option => {
+                const bookingOption = alreadyBook.filter(book => book.treatment === option.name);
+                const bookingSlot = bookingOption.map(book => book.slot)
+                const remainingSlots = option.slots.filter(slot => !bookingSlot.includes(slot))
+                option.slots = remainingSlots
+            })
             res.send(options);
         });
 
         app.post('/bookings', async (req, res) => {
             const booking = req.body;
+            const query = {
+                appointmentDate: booking.appointmentDate,
+                email: booking.email,
+                treatment: booking.treatment
+            }
+            const alreadyBooked = await bookingsCollections.find(query).toArray()
+
+            if (alreadyBooked.length) {
+                const message = `You already have a booking on ${booking.appointmentDate}`
+                return res.send({ acknowledge: false, message })
+            }
             const result = await bookingsCollections.insertOne(booking);
             res.send(result)
         });
