@@ -26,6 +26,12 @@ async function run() {
         const appointmentOptionCollection = client.db("doctorsPortal").collection("appointmentOptions");
         const bookingsCollections = client.db("doctorsPortal").collection("bookings");
 
+        app.get('/bookings', async(req, res) => {
+            const email = req.query.email;
+            const query = { email : email}
+            const bookings = await bookingsCollections.find(query).toArray()
+            res.send(bookings)
+        })
         app.get("/appointmentOptions", async (req, res) => {
             const date = req.query.date;
             const query = {};
