@@ -1,4 +1,4 @@
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -64,12 +64,14 @@ async function run() {
             const email = req.query.email;
             const query = { email: email };
             const user = await usersCollections.findOne(query);
-            if (user) {
+
+            if (user && user.email) {
                 const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '2h' });
                 res.send({ accessToken: token });
+            } else {
+                res.status(403).send({ accessToken: '' });
             }
-            res.status(403).send({ accessToken: ' ' })
-        })
+        });
         app.get("/appointmentOptions", async (req, res) => {
             const date = req.query.date;
             const query = {};
@@ -106,7 +108,29 @@ async function run() {
             const query = {};
             const users = await usersCollections.find(query).toArray();
             res.send(users)
-        })
+        });
+
+        app.put('/users/admin/:id', verifyJWT, async (req, res) => {
+            const decodedEmail = req.decoded.email;
+            const query = { email: decodedEmail };
+            const user = await usersCollections.findOne(query)
+            if (user.Role !== 'admin') {
+                console.log('He is not admin');
+                return res.status(403).send(message = 'forbidder access')
+            };
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const options = { upsert: true }
+
+            const updateDoc = {
+                $set: {
+                    Role: "admin"
+                }
+            };
+            const result = await usersCollections.updateOne(filter, updateDoc, options)
+
+            res.send(result)
+        });
 
     }
     finally {
