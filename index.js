@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const app = express();
 const port = process.env.PORT || 5000;
 require("dotenv").config();
-
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 
 // middleware
@@ -36,12 +36,13 @@ function verifyJWT(req, res, next) {
 }
 async function run() {
     try {
+
         const appointmentOptionCollection = client.db("doctorsPortal").collection("appointmentOptions");
         const bookingsCollections = client.db("doctorsPortal").collection("bookings");
         const usersCollections = client.db("doctorsPortal").collection("users");
         const doctorsCollections = client.db("doctorsPortal").collection("doctors");
 
-
+        // admin verification function
         async function verifyAdmin(req, res, next) {
             const decodedEmail = req.decoded.email;
             const query = { email: decodedEmail };
@@ -52,8 +53,38 @@ async function run() {
             };
             next();
 
-        }
+        };
 
+        app.post('/create-payment-intent', async (req, res) => {
+            const booking = req.body;
+            const price = booking.price;
+            const amount = price * 100;
+            console.log(amount);
+            // const secretKey = process.env.STRIPE_SK;
+            // const headers = {
+            //     'Authorization': `Bearer ${secretKey}`
+            // };
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: "usd",
+                automatic_payment_methods: {
+                    enabled: true,
+                },
+            });
+            // {
+            //     headers: headers
+            // }
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        });
+        app.get('/payment/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const booking = await bookingsCollections.findOne(query);
+            res.send(booking)
+        })
         app.delete('/doctors/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const id = req.params.id
             const query = { _id: new ObjectId(id) };
@@ -88,6 +119,7 @@ async function run() {
             const user = await usersCollections.findOne(query);
             res.send({ isAdmin: user?.role === 'admin' })
         });
+
         app.post('/users', verifyJWT, async (req, res) => {
             const user = req.body;
             const result = await usersCollections.insertOne(user);
@@ -178,6 +210,19 @@ async function run() {
             res.send(result)
         });
 
+        // temporary api for price add in appointmentOptionCollection 
+        // app.get('/priceAdd', async (req, res) => {
+        //     const filter = {};
+        //     const options = { upsert: true };
+        //     const updateDoc = {
+        //         $set: {
+        //             price: '99'
+        //         }
+        //     };
+        //     const result = await appointmentOptionCollection.updateMany(filter, updateDoc, options)
+        //     res.send(result)
+        // })
+
     }
     finally {
 
@@ -188,6 +233,7 @@ run().catch((error) => console.error(error));
 
 
 app.get('/', (req, res) => {
+    console.log(process.env.STRIPE_SK);
     res.send('doctors portal server is running')
 });
 
