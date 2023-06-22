@@ -23,9 +23,7 @@ function verifyJWT(req, res, next) {
     if (!authHeader) {
         return res.status(401).send('unauthorized access')
     }
-
     const token = authHeader.split(' ')[1];
-
     jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
         if (err) {
             return res.status(401).send('forbidden access')
@@ -59,11 +57,6 @@ async function run() {
             const booking = req.body;
             const price = booking.price;
             const amount = price * 100;
-            console.log(amount);
-            // const secretKey = process.env.STRIPE_SK;
-            // const headers = {
-            //     'Authorization': `Bearer ${secretKey}`
-            // };
 
             const paymentIntent = await stripe.paymentIntents.create({
                 amount: amount,
@@ -72,9 +65,7 @@ async function run() {
                     enabled: true,
                 },
             });
-            // {
-            //     headers: headers
-            // }
+
             res.send({
                 clientSecret: paymentIntent.client_secret,
             });
@@ -120,8 +111,18 @@ async function run() {
             res.send({ isAdmin: user?.role === 'admin' })
         });
 
-        app.post('/users', verifyJWT, async (req, res) => {
+        // User info save in database api
+        app.post('/users', async (req, res) => {
             const user = req.body;
+            const alreadyExist = await usersCollections.findOne(user)
+            console.log(alreadyExist);
+            const message = `${alreadyExist.name} already access`;
+
+            if (alreadyExist) {
+                console.log(alreadyExist.name);
+                return res.send({ acknowledge: false, message })
+            }
+
             const result = await usersCollections.insertOne(user);
             res.send(result)
         });
