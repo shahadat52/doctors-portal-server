@@ -39,6 +39,7 @@ async function run() {
         const bookingsCollections = client.db("doctorsPortal").collection("bookings");
         const usersCollections = client.db("doctorsPortal").collection("users");
         const doctorsCollections = client.db("doctorsPortal").collection("doctors");
+        const paymentsCollections = client.db("doctorsPortal").collection("payments");
 
         // admin verification function
         async function verifyAdmin(req, res, next) {
@@ -52,7 +53,23 @@ async function run() {
             next();
 
         };
+        // payment data stored and payment status update api
+        app.post('/payment', async (req, res) => {
+            const payment = req.body;
+            const result = await paymentsCollections.insertOne(payment)
+            const id = payment.bookingId;
+            const filter = { _id: new ObjectId(id) };
+            const options = { upsert: true }
 
+            const updateDoc = {
+                $set: {
+                    paid: 'true'
+                }
+            };
+            const updateResult = await bookingsCollections.updateOne(filter, updateDoc, options)
+            console.log('alhamdulillah successful');
+            res.send(result)
+        });
         app.post('/create-payment-intent', async (req, res) => {
             const booking = req.body;
             const price = booking.price;
@@ -116,15 +133,16 @@ async function run() {
             const user = req.body;
             const alreadyExist = await usersCollections.findOne(user)
             console.log(alreadyExist);
-            const message = `${alreadyExist.name} already access`;
+
 
             if (alreadyExist) {
+                const message = `${alreadyExist.name} already access`;
                 console.log(alreadyExist.name);
                 return res.send({ acknowledge: false, message })
             }
-
             const result = await usersCollections.insertOne(user);
             res.send(result)
+
         });
         app.get('/bookings', verifyJWT, async (req, res) => {
             const email = req.query.email;
