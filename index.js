@@ -53,46 +53,50 @@ async function run() {
             next();
 
         };
+
         // payment data stored and payment status update api
         app.post('/payment', async (req, res) => {
-            const payment = req.body;
-            const result = await paymentsCollections.insertOne(payment)
-            const id = payment.bookingId;
-            const filter = { _id: new ObjectId(id) };
-            const options = { upsert: true }
+            const paymentInfo = req.body;
+            const result = await paymentsCollections.insertOne(paymentInfo);
 
+            const id = paymentInfo.bookingId;
+            const filter = { _id: new ObjectId(id) };
+            const options = { upsert: true };
             const updateDoc = {
                 $set: {
-                    paid: 'true'
+                    paid: 'true',
+                    transactionId: paymentInfo.transactionId
                 }
             };
-            const updateResult = await bookingsCollections.updateOne(filter, updateDoc, options)
-            console.log('alhamdulillah successful');
+            const updateResult = await bookingsCollections.updateOne(filter, updateDoc, options);
             res.send(result)
+
         });
+        // payment intent api
         app.post('/create-payment-intent', async (req, res) => {
             const booking = req.body;
             const price = booking.price;
             const amount = price * 100;
-
+            console.log(amount);
             const paymentIntent = await stripe.paymentIntents.create({
                 amount: amount,
-                currency: "usd",
-                automatic_payment_methods: {
-                    enabled: true,
-                },
+                currency: 'usd',
+                "payment_method_types": [
+                    "card"
+                ],
             });
-
             res.send({
                 clientSecret: paymentIntent.client_secret,
             });
         });
+        // find specific booking api 
         app.get('/payment/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const booking = await bookingsCollections.findOne(query);
             res.send(booking)
-        })
+        });
+
         app.delete('/doctors/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const id = req.params.id
             const query = { _id: new ObjectId(id) };
@@ -137,7 +141,6 @@ async function run() {
 
             if (alreadyExist) {
                 const message = `${alreadyExist.name} already access`;
-                console.log(alreadyExist.name);
                 return res.send({ acknowledge: false, message })
             }
             const result = await usersCollections.insertOne(user);
